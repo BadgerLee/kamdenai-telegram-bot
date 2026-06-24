@@ -21,9 +21,7 @@ def verify_signature(body: bytes, signature: str) -> bool:
     if not KAMDENAI_SECRET:
         return True
     expected = hmac.new(KAMDENAI_SECRET.encode(), body, hashlib.sha256).hexdigest()
-    sig = signature.removeprefix("sha256=")
-    print(f"DEBUG received signature: {repr(signature)}")
-    print(f"DEBUG computed expected:  {expected}")
+    sig = signature.removeprefix("v1=")
     return hmac.compare_digest(expected, sig)
 
 
