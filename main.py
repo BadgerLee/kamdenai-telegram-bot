@@ -36,11 +36,11 @@ def format_message(event: str, payload: dict) -> str:
         market_detail = scan.get("marketDetail", "")
         watch = scan.get("watchSignals", [])
         lines = [
-            f"📋 *9:28 AM Plan Scan* — {date_key}",
-            f"Market: *{market}* — {market_detail}",
+            f"📋 9:28 AM Plan Scan — {date_key}",
+            f"Market: {market} — {market_detail}",
         ]
         if watch:
-            lines.append("\n*Watch List:*")
+            lines.append("\nWatch List:")
             for s in watch:
                 ticker = s.get("ticker", "?")
                 name = s.get("name", "")
@@ -49,7 +49,7 @@ def format_message(event: str, payload: dict) -> str:
                 target = s.get("target", "?")
                 shares = s.get("shares", "?")
                 lines.append(
-                    f"  • *{ticker}* ({name})\n"
+                    f"  • {ticker} ({name})\n"
                     f"    Entry ${entry} | Stop ${stop} | Target ${target} | {shares} shares"
                 )
         else:
@@ -61,8 +61,8 @@ def format_message(event: str, payload: dict) -> str:
         market = data.get("marketStatus", "?")
         market_detail = data.get("marketDetail", "")
         lines = [
-            f"✅ *9:30 AM Confirmed Buys* — {date_key}",
-            f"Market: *{market}* — {market_detail}",
+            f"✅ 9:30 AM Confirmed Buys — {date_key}",
+            f"Market: {market} — {market_detail}",
         ]
         if buys:
             for b in buys:
@@ -75,7 +75,7 @@ def format_message(event: str, payload: dict) -> str:
                 risk = b.get("riskDollars", "?")
                 label = b.get("openingConfirmation", {}).get("statusLabel", "")
                 lines.append(
-                    f"\n  *{ticker}* ({name}) — {label}\n"
+                    f"\n  {ticker} ({name}) — {label}\n"
                     f"  Entry ${entry} | Stop ${stop} | Target ${target}\n"
                     f"  {shares} shares | Risk ${risk}"
                 )
@@ -87,7 +87,7 @@ def format_message(event: str, payload: dict) -> str:
         results = data.get("quickExitResults", [])
         confirmed_count = data.get("confirmedBuyCount", 0)
         no_buys = data.get("noConfirmedBuys", False)
-        lines = [f"💰 *10:05 AM Quick Exit* — {date_key}"]
+        lines = [f"💰 10:05 AM Quick Exit — {date_key}"]
         if no_buys:
             lines.append("No confirmed buys today.")
         else:
@@ -104,11 +104,11 @@ def format_message(event: str, payload: dict) -> str:
                 total_profit += profit or 0
                 emoji = "🟢" if (profit or 0) > 0 else "🔴"
                 lines.append(
-                    f"\n  {emoji} *{ticker}* — {status}\n"
+                    f"\n  {emoji} {ticker} — {status}\n"
                     f"  Entry ${entry} → Exit ${price} | {shares} shares\n"
-                    f"  P&L: *${profit}* ({r_val}R)"
+                    f"  P&L: ${profit} ({r_val}R)"
                 )
-            lines.append(f"\n*Total P&L: ${total_profit:.2f}*")
+            lines.append(f"\nTotal P&L: ${total_profit:.2f}")
         return "\n".join(lines)
 
     # fallback — plain text to avoid Markdown parse errors
@@ -123,7 +123,6 @@ async def send_telegram(text: str) -> None:
             json={
                 "chat_id": TELEGRAM_CHAT_ID,
                 "text": text,
-                "parse_mode": "Markdown",
             },
         )
     if not resp.is_success:
