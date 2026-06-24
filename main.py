@@ -150,6 +150,8 @@ async def kamdenai_webhook(
 ):
     body = await request.body()
 
+    print(f"DEBUG all headers: {dict(request.headers)}")
+
     if not verify_signature(body, x_kamdenai_signature, x_kamdenai_delivery):
         raise HTTPException(status_code=401, detail="Invalid signature")
 
