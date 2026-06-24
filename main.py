@@ -18,14 +18,24 @@ TELEGRAM_API = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
 app = FastAPI()
 
 
-def verify_signature(body: bytes, signature: str) -> bool:
+def verify_signature(body: bytes, signature: str, delivery: str = "") -> bool:
     if not KAMDENAI_SECRET:
         return True
     raw_secret = base64.b64decode(KAMDENAI_SECRET.removeprefix("whsec_"))
-    expected = hmac.new(raw_secret, body, hashlib.sha256).hexdigest()
     sig = signature.removeprefix("v1=")
+
+    candidates = {
+        "body only":            body,
+        "delivery.body":        f"{delivery}.".encode() + body,
+        "body.delivery":        body + f".{delivery}".encode(),
+    }
+    for label, msg in candidates.items():
+        computed = hmac.new(raw_secret, msg, hashlib.sha256).hexdigest()
+        print(f"DEBUG [{label}] computed: {computed}")
+
     print(f"DEBUG received: {sig}")
-    print(f"DEBUG computed: {expected}")
+    # still try body-only for now
+    expected = hmac.new(raw_secret, body, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, sig)
 
 
@@ -140,7 +150,7 @@ async def kamdenai_webhook(
 ):
     body = await request.body()
 
-    if not verify_signature(body, x_kamdenai_signature):
+    if not verify_signature(body, x_kamdenai_signature, x_kamdenai_delivery):
         raise HTTPException(status_code=401, detail="Invalid signature")
 
     payload = await request.json()
