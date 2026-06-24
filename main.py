@@ -24,6 +24,8 @@ def verify_signature(body: bytes, signature: str) -> bool:
     raw_secret = base64.b64decode(KAMDENAI_SECRET.removeprefix("whsec_"))
     expected = hmac.new(raw_secret, body, hashlib.sha256).hexdigest()
     sig = signature.removeprefix("v1=")
+    print(f"DEBUG received: {sig}")
+    print(f"DEBUG computed: {expected}")
     return hmac.compare_digest(expected, sig)
 
 
