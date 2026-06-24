@@ -21,7 +21,9 @@ def verify_signature(body: bytes, signature: str) -> bool:
     if not KAMDENAI_SECRET:
         return True  # skip verification if no secret configured
     expected = hmac.new(KAMDENAI_SECRET.encode(), body, hashlib.sha256).hexdigest()
-    return hmac.compare_digest(expected, signature)
+    # handle both raw hex and "sha256=<hex>" prefix formats
+    sig = signature.removeprefix("sha256=")
+    return hmac.compare_digest(expected, sig)
 
 
 def format_message(event: str, payload: dict) -> str:
@@ -109,8 +111,9 @@ def format_message(event: str, payload: dict) -> str:
             lines.append(f"\n*Total P&L: ${total_profit:.2f}*")
         return "\n".join(lines)
 
-    # fallback
-    return f"*{event}*\n{date_key}\n{data}"
+    # fallback — plain text to avoid Markdown parse errors
+    import json
+    return f"{event}\n{date_key}\n{json.dumps(data, indent=2)}"
 
 
 async def send_telegram(text: str) -> None:
@@ -123,6 +126,8 @@ async def send_telegram(text: str) -> None:
                 "parse_mode": "Markdown",
             },
         )
+    if not resp.is_success:
+        print(f"Telegram error {resp.status_code}: {resp.text}")
     resp.raise_for_status()
 
 
