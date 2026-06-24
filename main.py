@@ -19,10 +19,11 @@ app = FastAPI()
 
 def verify_signature(body: bytes, signature: str) -> bool:
     if not KAMDENAI_SECRET:
-        return True  # skip verification if no secret configured
+        return True
     expected = hmac.new(KAMDENAI_SECRET.encode(), body, hashlib.sha256).hexdigest()
-    # handle both raw hex and "sha256=<hex>" prefix formats
     sig = signature.removeprefix("sha256=")
+    print(f"DEBUG received signature: {repr(signature)}")
+    print(f"DEBUG computed expected:  {expected}")
     return hmac.compare_digest(expected, sig)
 
 
