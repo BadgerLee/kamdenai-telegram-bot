@@ -23,6 +23,9 @@ app = FastAPI()
 # In-memory pending orders. Wiped on Railway restart — fine for a same-day approval flow.
 PENDING_ORDERS: dict[str, dict] = {}
 
+# Positions we have opened today (ticker -> {shares, entry}). Closed at 10:05.
+OPEN_POSITIONS: dict[str, dict] = {}
+
 
 def verify_signature(body: bytes, signature: str, delivery: str = "", timestamp: str = "") -> bool:
     if not KAMDENAI_SECRET:
@@ -61,16 +64,17 @@ async def answer_callback(callback_query_id: str, text: str = "") -> None:
 
 
 def place_order_stub(order: dict) -> str:
-    """Placeholder for the IBKR order call.
-
-    Returns a human-readable status string. Replace this with the real
-    broker call in Phase B.
-    """
+    """Open a position. Stub until IBKR is wired."""
+    OPEN_POSITIONS[order["ticker"]] = {"shares": order["shares"], "entry": order["entry"]}
     return (
-        f"[PAPER STUB] Would place bracket order:\n"
-        f"  BUY {order['shares']} {order['ticker']} @ ${order['entry']}\n"
-        f"  Stop ${order['stop']} | Target ${order['target']}"
+        f"[PAPER STUB] Would BUY {order['shares']} {order['ticker']} @ ${order['entry']}\n"
+        f"Stop ${order['stop']} | Target ${order['target']}"
     )
+
+
+def close_position_stub(ticker: str, shares: int) -> str:
+    """Close a position. Stub until IBKR is wired."""
+    return f"[PAPER STUB] Would SELL {shares} {ticker} @ market"
 
 
 async def handle_morning_scan(data: dict, date_key: str) -> None:
@@ -160,6 +164,15 @@ async def handle_quick_exit(data: dict, date_key: str) -> None:
             )
         lines.append(f"\n<b>Total P&amp;L: ${total_profit:.2f}</b>")
     await send_message("\n".join(lines))
+
+    # Auto-close any positions we opened this morning.
+    if OPEN_POSITIONS:
+        close_lines = ["🔔 <b>Closing open positions:</b>"]
+        for ticker, pos in list(OPEN_POSITIONS.items()):
+            status = close_position_stub(ticker, pos["shares"])
+            close_lines.append(f"<code>{status}</code>")
+            del OPEN_POSITIONS[ticker]
+        await send_message("\n".join(close_lines))
 
 
 @app.post("/kamdenai/webhook")
