@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import hmac
 import os
@@ -20,12 +21,9 @@ app = FastAPI()
 def verify_signature(body: bytes, signature: str) -> bool:
     if not KAMDENAI_SECRET:
         return True
-    expected = hmac.new(KAMDENAI_SECRET.encode(), body, hashlib.sha256).hexdigest()
+    raw_secret = base64.b64decode(KAMDENAI_SECRET.removeprefix("whsec_"))
+    expected = hmac.new(raw_secret, body, hashlib.sha256).hexdigest()
     sig = signature.removeprefix("v1=")
-    print(f"DEBUG secret length: {len(KAMDENAI_SECRET)}, first 6 chars: {KAMDENAI_SECRET[:6]!r}")
-    print(f"DEBUG body length: {len(body)}")
-    print(f"DEBUG received sig (after prefix): {sig}")
-    print(f"DEBUG computed:                    {expected}")
     return hmac.compare_digest(expected, sig)
 
 
