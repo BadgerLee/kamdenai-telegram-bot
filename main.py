@@ -234,6 +234,30 @@ async def telegram_webhook(secret: str, request: Request):
     return {"ok": True}
 
 
+@app.post("/dev/replay/{secret}")
+async def dev_replay(secret: str, request: Request):
+    """Replay any KamdenAI-shaped payload without signature checks.
+    Guarded by TELEGRAM_CALLBACK_SECRET so only you can call it.
+    """
+    if not TELEGRAM_CALLBACK_SECRET or secret != TELEGRAM_CALLBACK_SECRET:
+        raise HTTPException(status_code=401, detail="bad secret")
+
+    payload = await request.json()
+    event = payload.get("event", "confirmed_buys.created")
+    data = payload.get("data", {})
+    date_key = payload.get("dateKey", "test")
+
+    if event == "morning_scan.created":
+        await handle_morning_scan(data, date_key)
+    elif event == "confirmed_buys.created":
+        await handle_confirmed_buys(data, date_key)
+    elif event == "quick_exit_results.created":
+        await handle_quick_exit(data, date_key)
+    else:
+        await send_message(f"Replayed: {event}")
+    return {"ok": True}
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
