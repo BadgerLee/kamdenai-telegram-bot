@@ -1,4 +1,3 @@
-import base64
 import hashlib
 import hmac
 import os
@@ -21,32 +20,9 @@ app = FastAPI()
 def verify_signature(body: bytes, signature: str, delivery: str = "", timestamp: str = "") -> bool:
     if not KAMDENAI_SECRET:
         return True
-    raw_secret = base64.b64decode(KAMDENAI_SECRET.removeprefix("whsec_"))
-    sig = signature.removeprefix("v1=").removeprefix("v1-")
-
-    # Try every plausible combo
-    combos = {
-        "delivery.timestamp.body (hex)":       (f"{delivery}.{timestamp}.".encode() + body, "hex"),
-        "delivery.timestamp.body (b64)":       (f"{delivery}.{timestamp}.".encode() + body, "b64"),
-        "timestamp.body (hex)":                (f"{timestamp}.".encode() + body, "hex"),
-        "timestamp.body (b64)":                (f"{timestamp}.".encode() + body, "b64"),
-        "body only (hex, raw secret string)":  (body, "hex_str"),
-        "timestamp.body (hex, raw str secret)": (f"{timestamp}.".encode() + body, "hex_str"),
-    }
-    for label, (msg, mode) in combos.items():
-        if mode == "hex":
-            c = hmac.new(raw_secret, msg, hashlib.sha256).hexdigest()
-        elif mode == "b64":
-            c = base64.b64encode(hmac.new(raw_secret, msg, hashlib.sha256).digest()).decode()
-        else:
-            c = hmac.new(KAMDENAI_SECRET.encode(), msg, hashlib.sha256).hexdigest()
-        print(f"DEBUG [{label}]: {c}")
-
-    print(f"DEBUG received: {sig}")
-    print(f"DEBUG timestamp header: {timestamp!r}, delivery: {delivery!r}")
-
-    signed_content = f"{delivery}.{timestamp}.".encode() + body
-    expected = hmac.new(raw_secret, signed_content, hashlib.sha256).hexdigest()
+    sig = signature.removeprefix("v1=")
+    signed_content = f"{timestamp}.".encode() + body
+    expected = hmac.new(KAMDENAI_SECRET.encode(), signed_content, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, sig)
 
 
