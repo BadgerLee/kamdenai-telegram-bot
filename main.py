@@ -36,11 +36,11 @@ def format_message(event: str, payload: dict) -> str:
         market_detail = scan.get("marketDetail", "")
         watch = scan.get("watchSignals", [])
         lines = [
-            f"📋 9:28 AM Plan Scan — {date_key}",
-            f"Market: {market} — {market_detail}",
+            f"📋 <b>9:28 AM Plan Scan</b> — {date_key}",
+            f"Market: <b>{market}</b> — {market_detail}",
         ]
         if watch:
-            lines.append("\nWatch List:")
+            lines.append("\n<b>Watch List:</b>")
             for s in watch:
                 ticker = s.get("ticker", "?")
                 name = s.get("name", "")
@@ -49,7 +49,7 @@ def format_message(event: str, payload: dict) -> str:
                 target = s.get("target", "?")
                 shares = s.get("shares", "?")
                 lines.append(
-                    f"  • {ticker} ({name})\n"
+                    f"  • <b>{ticker}</b> ({name})\n"
                     f"    Entry ${entry} | Stop ${stop} | Target ${target} | {shares} shares"
                 )
         else:
@@ -61,8 +61,8 @@ def format_message(event: str, payload: dict) -> str:
         market = data.get("marketStatus", "?")
         market_detail = data.get("marketDetail", "")
         lines = [
-            f"✅ 9:30 AM Confirmed Buys — {date_key}",
-            f"Market: {market} — {market_detail}",
+            f"✅ <b>9:30 AM Confirmed Buys</b> — {date_key}",
+            f"Market: <b>{market}</b> — {market_detail}",
         ]
         if buys:
             for b in buys:
@@ -75,7 +75,7 @@ def format_message(event: str, payload: dict) -> str:
                 risk = b.get("riskDollars", "?")
                 label = b.get("openingConfirmation", {}).get("statusLabel", "")
                 lines.append(
-                    f"\n  {ticker} ({name}) — {label}\n"
+                    f"\n  <b>{ticker}</b> ({name}) — {label}\n"
                     f"  Entry ${entry} | Stop ${stop} | Target ${target}\n"
                     f"  {shares} shares | Risk ${risk}"
                 )
@@ -85,9 +85,8 @@ def format_message(event: str, payload: dict) -> str:
 
     if event == "quick_exit_results.created":
         results = data.get("quickExitResults", [])
-        confirmed_count = data.get("confirmedBuyCount", 0)
         no_buys = data.get("noConfirmedBuys", False)
-        lines = [f"💰 10:05 AM Quick Exit — {date_key}"]
+        lines = [f"💰 <b>10:05 AM Quick Exit</b> — {date_key}"]
         if no_buys:
             lines.append("No confirmed buys today.")
         else:
@@ -104,27 +103,26 @@ def format_message(event: str, payload: dict) -> str:
                 total_profit += profit or 0
                 emoji = "🟢" if (profit or 0) > 0 else "🔴"
                 lines.append(
-                    f"\n  {emoji} {ticker} — {status}\n"
+                    f"\n  {emoji} <b>{ticker}</b> — {status}\n"
                     f"  Entry ${entry} → Exit ${price} | {shares} shares\n"
-                    f"  P&L: ${profit} ({r_val}R)"
+                    f"  P&amp;L: <b>${profit}</b> ({r_val}R)"
                 )
-            lines.append(f"\nTotal P&L: ${total_profit:.2f}")
+            lines.append(f"\n<b>Total P&amp;L: ${total_profit:.2f}</b>")
         return "\n".join(lines)
 
-    # fallback — plain text to avoid Markdown parse errors
+    if event == "webhook.test":
+        return "✅ KamdenAI webhook connected successfully!"
+
     import json
     return f"{event}\n{date_key}\n{json.dumps(data, indent=2)}"
 
 
-async def send_telegram(text: str) -> None:
+async def send_telegram(text: str, use_html: bool = False) -> None:
+    payload = {"chat_id": TELEGRAM_CHAT_ID, "text": text}
+    if use_html:
+        payload["parse_mode"] = "HTML"
     async with httpx.AsyncClient() as client:
-        resp = await client.post(
-            f"{TELEGRAM_API}/sendMessage",
-            json={
-                "chat_id": TELEGRAM_CHAT_ID,
-                "text": text,
-            },
-        )
+        resp = await client.post(f"{TELEGRAM_API}/sendMessage", json=payload)
     if not resp.is_success:
         print(f"Telegram error {resp.status_code}: {resp.text}")
     resp.raise_for_status()
@@ -144,9 +142,10 @@ async def kamdenai_webhook(
 
     payload = await request.json()
     text = format_message(x_kamdenai_event, payload)
+    use_html = x_kamdenai_event in ("morning_scan.created", "confirmed_buys.created", "quick_exit_results.created", "webhook.test")
 
     try:
-        await send_telegram(text)
+        await send_telegram(text, use_html=use_html)
     except httpx.HTTPStatusError as exc:
         raise HTTPException(status_code=502, detail=f"Telegram error: {exc}") from exc
 
