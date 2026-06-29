@@ -184,6 +184,7 @@ async def kamdenai_webhook(
     x_kamdenai_timestamp: str = Header(""),
 ):
     body = await request.body()
+    print(f"PAYLOAD [{x_kamdenai_event}]: {body.decode()}")
     if not verify_signature(body, x_kamdenai_signature, x_kamdenai_delivery, x_kamdenai_timestamp):
         raise HTTPException(status_code=401, detail="Invalid signature")
 
