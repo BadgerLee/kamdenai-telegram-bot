@@ -116,6 +116,7 @@ async def handle_confirmed_buys(data: dict, date_key: str) -> None:
 
     for b in buys:
         order_id = secrets.token_urlsafe(6)
+        opening = b.get("openingConfirmation", {})
         order = {
             "ticker": b.get("ticker", "?"),
             "name": b.get("name", ""),
@@ -124,16 +125,19 @@ async def handle_confirmed_buys(data: dict, date_key: str) -> None:
             "target": b.get("target", 0),
             "shares": b.get("shares", 0),
             "risk": b.get("riskDollars", 0),
+            "max_chase_price": opening.get("maxChasePrice"),
             "created_at": time.time(),
         }
         PENDING_ORDERS[order_id] = order
-        label = b.get("openingConfirmation", {}).get("statusLabel", "")
+        label = opening.get("statusLabel", "")
 
         text = (
             f"<b>{order['ticker']}</b> ({order['name']}) — {label}\n"
             f"Entry ${order['entry']} | Stop ${order['stop']} | Target ${order['target']}\n"
             f"{order['shares']} shares | Risk ${order['risk']}"
         )
+        if order["max_chase_price"] is not None:
+            text += f"\nMax Chase Price: ${order['max_chase_price']}"
         keyboard = {
             "inline_keyboard": [[
                 {"text": f"✅ Buy {order['ticker']}", "callback_data": f"buy:{order_id}"},
