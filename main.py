@@ -63,18 +63,18 @@ async def answer_callback(callback_query_id: str, text: str = "") -> None:
     await telegram("answerCallbackQuery", {"callback_query_id": callback_query_id, "text": text})
 
 
-def place_order_stub(order: dict) -> str:
-    """Open a position. Stub until IBKR is wired."""
-    OPEN_POSITIONS[order["ticker"]] = {"shares": order["shares"], "entry": order["entry"]}
+def format_claude_prompt(order: dict) -> str:
+    max_chase = order.get("max_chase_price")
+    chase_line = f"Max chase price: ${max_chase}" if max_chase else ""
     return (
-        f"[PAPER STUB] Would BUY {order['shares']} {order['ticker']} @ ${order['entry']}\n"
-        f"Stop ${order['stop']} | Target ${order['target']}"
-    )
-
-
-def close_position_stub(ticker: str, shares: int) -> str:
-    """Close a position. Stub until IBKR is wired."""
-    return f"[PAPER STUB] Would SELL {shares} {ticker} @ market"
+        f"Buy {order['ticker']} ({order['name']}), {order['shares']} shares.\n"
+        f"Limit entry: ${order['entry']} | Stop: ${order['stop']} | Target: ${order['target']}\n"
+        f"{chase_line}\n\n"
+        f"Check the live price of {order['ticker']}. "
+        f"If current price > ${max_chase}, do NOT enter — price has chased too far. "
+        f"Otherwise, create a buy order instruction for {order['shares']} shares of "
+        f"{order['ticker']} at ${order['entry']} limit."
+    ).strip()
 
 
 async def handle_morning_scan(data: dict, date_key: str) -> None:
@@ -171,10 +171,9 @@ async def handle_quick_exit(data: dict, date_key: str) -> None:
 
     # Auto-close any positions we opened this morning.
     if OPEN_POSITIONS:
-        close_lines = ["🔔 <b>Closing open positions:</b>"]
+        close_lines = ["🔔 <b>Close these positions in IBKR:</b>"]
         for ticker, pos in list(OPEN_POSITIONS.items()):
-            status = close_position_stub(ticker, pos["shares"])
-            close_lines.append(f"<code>{status}</code>")
+            close_lines.append(f"  SELL {pos['shares']} <b>{ticker}</b> @ market")
             del OPEN_POSITIONS[ticker]
         await send_message("\n".join(close_lines))
 
@@ -243,9 +242,11 @@ async def telegram_webhook(secret: str, request: Request):
         return {"ok": True}
 
     if action == "buy":
-        status = place_order_stub(order)
-        await edit_message(chat_id, message_id, original_text + f"\n\n✅ <b>Approved</b>\n<code>{status}</code>")
-        await answer_callback(cq_id, "Order sent")
+        OPEN_POSITIONS[order["ticker"]] = {"shares": order["shares"], "entry": order["entry"]}
+        await edit_message(chat_id, message_id, original_text + "\n\n✅ <b>Approved</b>")
+        await answer_callback(cq_id, "Done")
+        claude_prompt = format_claude_prompt(order)
+        await send_message(f"📋 <b>Claude prompt for {order['ticker']}:</b>\n\n<code>{claude_prompt}</code>")
         return {"ok": True}
 
     await answer_callback(cq_id, "Unknown action")
