@@ -77,6 +77,22 @@ def format_claude_prompt(order: dict) -> str:
     ).strip()
 
 
+def format_watchlist_claude_prompt(watch: list, date_key: str) -> str:
+    lines = [
+        f"It's 9:28 AM. Here are today's KamdenAI watch list tickers for {date_key}.",
+        "Create IBKR limit buy order instructions for ALL of them now so they're staged and ready.",
+        "I'll tell you which 2 are the official confirmed buys at 9:30 AM — don't confirm anything yet, just create the draft instructions.\n",
+    ]
+    for s in watch:
+        lines.append(
+            f"- {s.get('ticker','?')} ({s.get('name','')}): "
+            f"{s.get('shares','?')} shares, limit ${s.get('entry','?')}, "
+            f"stop ${s.get('stop','?')}, target ${s.get('target','?')}"
+        )
+    lines.append("\nCreate a limit BUY order instruction for each one and confirm when done.")
+    return "\n".join(lines)
+
+
 async def handle_morning_scan(data: dict, date_key: str) -> None:
     scan = data.get("scan", {})
     market = scan.get("marketStatus", "?")
@@ -98,16 +114,21 @@ async def handle_morning_scan(data: dict, date_key: str) -> None:
         lines.append("No watch signals today.")
     await send_message("\n".join(lines))
 
+    if watch:
+        prompt = format_watchlist_claude_prompt(watch, date_key)
+        await send_message(f"📋 <b>Paste into Claude iOS now:</b>\n\n<code>{prompt}</code>")
+
 
 async def handle_confirmed_buys(data: dict, date_key: str) -> None:
     buys = data.get("confirmedBuys", [])
     market = data.get("marketStatus", "?")
     market_detail = data.get("marketDetail", "")
 
+    tickers = " + ".join(b.get("ticker", "?") for b in buys) if buys else "none"
     await send_message(
         f"✅ <b>9:30 AM Confirmed Buys</b> — {date_key}\n"
         f"Market: <b>{market}</b> — {market_detail}\n"
-        f"{len(buys)} confirmed buy(s) below."
+        f"Official buys: <b>{tickers}</b> — confirm these in IBKR now 👆"
     )
 
     if not buys:
