@@ -65,31 +65,21 @@ async def answer_callback(callback_query_id: str, text: str = "") -> None:
 
 def format_claude_prompt(order: dict) -> str:
     max_chase = order.get("max_chase_price")
-    chase_line = f"Max chase price: ${max_chase}" if max_chase else ""
-    return (
-        f"Buy {order['ticker']} ({order['name']}), {order['shares']} shares.\n"
-        f"Limit entry: ${order['entry']} | Stop: ${order['stop']} | Target: ${order['target']}\n"
-        f"{chase_line}\n\n"
-        f"Check the live price of {order['ticker']}. "
-        f"If current price > ${max_chase}, do NOT enter — price has chased too far. "
-        f"Otherwise, create a buy order instruction for {order['shares']} shares of "
-        f"{order['ticker']} at ${order['entry']} limit."
-    ).strip()
+    prompt = f"Buy {order['shares']} shares of {order['ticker']} at a limit of ${order['entry']}"
+    if max_chase:
+        prompt += f" — only if the current price is at or below ${max_chase}"
+    return prompt
 
 
 def format_watchlist_claude_prompt(watch: list, date_key: str) -> str:
     lines = [
-        f"It's 9:28 AM. Here are today's KamdenAI watch list tickers for {date_key}.",
-        "Create IBKR limit buy order instructions for ALL of them now so they're staged and ready.",
-        "I'll tell you which 2 are the official confirmed buys at 9:30 AM — don't confirm anything yet, just create the draft instructions.\n",
+        f"Stage IBKR limit buy order instructions for today's {date_key} watch list. Don't confirm yet — I'll tell you which 2 are official at 9:30.\n",
     ]
     for s in watch:
-        lines.append(
-            f"- {s.get('ticker','?')} ({s.get('name','')}): "
-            f"{s.get('shares','?')} shares, limit ${s.get('entry','?')}, "
-            f"stop ${s.get('stop','?')}, target ${s.get('target','?')}"
-        )
-    lines.append("\nCreate a limit BUY order instruction for each one and confirm when done.")
+        ticker = s.get("ticker", "?")
+        shares = s.get("shares", "?")
+        entry = s.get("entry", "?")
+        lines.append(f"Buy {shares} shares of {ticker} at a limit of ${entry}")
     return "\n".join(lines)
 
 
