@@ -26,6 +26,9 @@ PENDING_ORDERS: dict[str, dict] = {}
 # Positions we have opened today (ticker -> {shares, entry}). Closed at 10:05.
 OPEN_POSITIONS: dict[str, dict] = {}
 
+# Latest morning scan payload — fetched by local auto-stage script.
+LAST_SCAN: dict = {}
+
 
 def verify_signature(body: bytes, signature: str, delivery: str = "", timestamp: str = "") -> bool:
     if not KAMDENAI_SECRET:
@@ -104,9 +107,13 @@ async def handle_morning_scan(data: dict, date_key: str) -> None:
         lines.append("No watch signals today.")
     await send_message("\n".join(lines))
 
+    # Store for the local auto-stage script to fetch.
+    LAST_SCAN["watch"] = watch
+    LAST_SCAN["date_key"] = date_key
+
     if watch:
         prompt = format_watchlist_claude_prompt(watch, date_key)
-        await send_message(f"📋 <b>Paste into Claude iOS now:</b>\n\n<code>{prompt}</code>")
+        await send_message(f"📋 <b>Paste into Claude iOS now (or auto-staged):</b>\n\n<code>{prompt}</code>")
 
 
 async def handle_confirmed_buys(data: dict, date_key: str) -> None:
@@ -286,6 +293,13 @@ async def dev_replay(secret: str, request: Request):
     else:
         await send_message(f"Replayed: {event}")
     return {"ok": True}
+
+
+@app.get("/last-scan/{secret}")
+async def last_scan(secret: str):
+    if TELEGRAM_CALLBACK_SECRET and secret != TELEGRAM_CALLBACK_SECRET:
+        raise HTTPException(status_code=401, detail="bad secret")
+    return LAST_SCAN
 
 
 @app.get("/health")
